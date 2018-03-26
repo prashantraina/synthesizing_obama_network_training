@@ -75,11 +75,11 @@ class Speech(TFBase):
       audio = np.load(self.training_dir + "/audio/normalized-cep13/" + files[i] + ".wav.npy") 
       audiodiff = audio[1:,:-1] - audio[:-1, :-1]
 
-      print files[i], audio.shape, tp
+      print(files[i], audio.shape, tp)
       timestamps = audio[:, -1]
 
       for dnum in dnums:
-        print dnum 
+        print(dnum) 
         fids = readCVFloatMat(self.training_dir + dnum + "/frontalfidsCoeff_unrefined.bin")
         if not os.path.exists(self.training_dir + dnum + "/startframe.txt"):
           startframe = 1
@@ -127,12 +127,12 @@ class Speech(TFBase):
       output_w = tf.get_variable("output_w", [args.rnn_size, self.dimout])
       output_b = tf.get_variable("output_b", [self.dimout])
 
-    inputs = tf.split(1, args.seq_length, self.input_data)
+    inputs = tf.split(self.input_data, args.seq_length, axis=1)
     inputs = [tf.squeeze(input_, [1]) for input_ in inputs]
 
-    outputs, states = tf.nn.seq2seq.rnn_decoder(inputs, self.initial_state, self.network, loop_function=None, scope='rnnlm')
+    outputs, states = tf.contrib.legacy_seq2seq.rnn_decoder(inputs, self.initial_state, self.network, loop_function=None, scope='rnnlm')
 
-    output = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
+    output = tf.reshape(tf.concat(outputs, axis=1), [-1, args.rnn_size])
     output = tf.nn.xw_plus_b(output, output_w, output_b)
     self.final_state = states
     self.output = output
@@ -147,7 +147,7 @@ class Speech(TFBase):
     tvars = tf.trainable_variables()
     grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, tvars), args.grad_clip)
     optimizer = tf.train.AdamOptimizer(self.lr)
-    self.train_op = optimizer.apply_gradients(zip(grads, tvars))
+    self.train_op = optimizer.apply_gradients(list(zip(grads, tvars)))
 
   def load_preprocessed(self, inps, outps):
     newinps = {"training": [], "validation": []}
@@ -161,7 +161,7 @@ class Speech(TFBase):
           else:
             newinps[key].append(inps[key][i])
             newoutps[key].append(outps[key][i])
-    print "load preprocessed", len(newinps), len(newoutps)
+    print("load preprocessed", len(newinps), len(newoutps))
     return newinps, newoutps
 
 
@@ -189,7 +189,7 @@ class Speech(TFBase):
       os.mkdir("results/")
 
     f = open("results/" + self.args.input2 + "_" + args.save_dir + ".txt", "w")
-    print "output to results/" + self.args.input2 + "_" + args.save_dir + ".txt"
+    print("output to results/" + self.args.input2 + "_" + args.save_dir + ".txt")
     f.write("%d %d\n" % (len(inp), self.dimout + 1))
     fetches = []
     fetches.append(self.output)

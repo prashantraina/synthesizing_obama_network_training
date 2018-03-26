@@ -7,7 +7,7 @@ import struct
 import argparse
 import time
 import os
-import cPickle
+import pickle
 import random
 import platform
 import glob
@@ -23,7 +23,7 @@ def readSingleInt(path):
     return int(f.readline())
 
 def readCVFloatMat(fl):
-  f = open(fl)
+  f = open(fl,"rb")
   t = struct.unpack('B', f.read(1))[0]
   if t != 5:
     return 0
@@ -91,7 +91,7 @@ class TFBase(object):
     self.parser.add_argument('--keep_prob', type=float, default=1,
                        help='dropout keep probability')
 
-    self.parser.add_argument('--save_dir', type=str, default='',
+    self.parser.add_argument('--save_dir', type=str, default='run1',
                        help='save directory')
     self.parser.add_argument('--usetrainingof', type=str, default='',
                        help='trainingset')
@@ -123,7 +123,7 @@ class TFBase(object):
       data_file = "data/training_" + self.args.save_dir + ".cpkl"
 
     if not (os.path.exists(data_file)) or self.args.reprocess:
-      print "creating training data cpkl file from raw source"
+      print("creating training data cpkl file from raw source")
       inps, outps = self.preprocess(data_file)
 
       meani, stdi, meano, stdo = self.normalize(inps, outps)
@@ -131,12 +131,12 @@ class TFBase(object):
       if not os.path.exists(os.path.dirname(data_file)):
         os.mkdir(os.path.dirname(data_file))
       f = open(data_file, "wb")
-      cPickle.dump({"input": inps["training"], "inputmean": meani, "inputstd": stdi, "output": outps["training"], "outputmean":meano, "outputstd": stdo, "vinput": inps["validation"], "voutput": outps["validation"]}, f, protocol=2) 
+      pickle.dump({"input": inps["training"], "inputmean": meani, "inputstd": stdi, "output": outps["training"], "outputmean":meano, "outputstd": stdo, "vinput": inps["validation"], "voutput": outps["validation"]}, f, protocol=2) 
       f.close() 
 
 
     f = open(data_file,"rb")
-    data = cPickle.load(f)
+    data = pickle.load(f)
     inps = {"training": data["input"], "validation": data["vinput"]} 
     outps = {"training": data["output"], "validation": data["voutput"]} 
     f.close()
@@ -161,7 +161,7 @@ class TFBase(object):
     # returns a randomised, seq_length sized portion of the training data
     x_batch = []
     y_batch = []
-    for i in xrange(self.args.batch_size):
+    for i in range(self.args.batch_size):
       inp = self.inps[key][self.pointer[key]]
       outp = self.outps[key][self.pointer[key]]
 
@@ -189,7 +189,7 @@ class TFBase(object):
     save_dir = self.args.save_dir
 
     with open(os.path.join("save/" + save_dir, 'config.pkl')) as f:
-      saved_args = cPickle.load(f)
+      saved_args = pickle.load(f)
 
     if len(saved_args.usetrainingof):
       pt = saved_args.usetrainingof
@@ -197,7 +197,7 @@ class TFBase(object):
       pt = save_dir
 
     with open("./data/training_" + pt + ".cpkl", "rb") as f:
-      raw = cPickle.load(f)
+      raw = pickle.load(f)
 
     model = self.model(saved_args, True)
     sess = tf.InteractiveSession()
@@ -205,15 +205,15 @@ class TFBase(object):
 
     ckpt = tf.train.get_checkpoint_state("save/" + save_dir)
     saver.restore(sess, ckpt.model_checkpoint_path)
-    print "loading model: ", ckpt.model_checkpoint_path
+    print("loading model: ", ckpt.model_checkpoint_path)
 
     saved_args.input = self.args.input
 
     self.sample(sess, saved_args, raw, pt)
 
   def train(self):
-    with open(os.path.join("save/" + self.args.save_dir, 'config.pkl'), 'w') as f:
-      cPickle.dump(self.args, f)
+    with open(os.path.join("save/" + self.args.save_dir, 'config.pkl'), 'wb') as f:
+      pickle.dump(self.args, f)
 
     with tf.Session() as sess:
       model = self.model(self.args)
@@ -221,8 +221,8 @@ class TFBase(object):
       tf.initialize_all_variables().run()
       ts = TrainingStatus(sess, self.args.num_epochs, self.num_batches["training"], save_interval = self.args.save_every, graph = sess.graph, save_dir = "save/" + self.args.save_dir)
 
-      print "training batches: ", self.num_batches["training"]
-      for e in xrange(ts.startEpoch, self.args.num_epochs):
+      print("training batches: ", self.num_batches["training"])
+      for e in range(ts.startEpoch, self.args.num_epochs):
         sess.run(tf.assign(self.lr, self.args.learning_rate * (self.args.decay_rate ** e)))
         self.reset_batch_pointer("training")
         self.reset_batch_pointer("validation")
@@ -240,7 +240,7 @@ class TFBase(object):
         for i, (c, m) in enumerate(self.initial_state):
           feed_dict[c], feed_dict[m] = state[i]
 
-        for b in xrange(self.num_batches["training"]):
+        for b in range(self.num_batches["training"]):
           ts.tic()
           x, y = self.next_batch()
 
@@ -250,13 +250,13 @@ class TFBase(object):
           res = sess.run(fetches, feed_dict)
           train_loss = res[0]
 
-          print ts.tocBatch(e, b, train_loss)
+          print(ts.tocBatch(e, b, train_loss))
 
         validLoss = 0
         if self.num_batches["validation"] > 0:
           fetches = []
           fetches.append(self.cost)
-          for b in xrange(self.num_batches["validation"]):
+          for b in range(self.num_batches["validation"]):
             x, y = self.next_batch("validation")
 
             feed_dict[self.input_data] = x
@@ -287,11 +287,11 @@ class TrainingStatus:
     if lastCheckpoint is None:
       self.startEpoch = 0
     else:
-      print "Last checkpoint :", lastCheckpoint
+      print("Last checkpoint :", lastCheckpoint)
       self.startEpoch = int(lastCheckpoint.split("-")[-1])
       self.saver.restore(sess, lastCheckpoint)
 
-    print "startEpoch = ", self.startEpoch
+    print("startEpoch = ", self.startEpoch)
 
     self.logwrite_interval = logwrite_interval
     self.eta_interval = eta_interval
@@ -335,7 +335,7 @@ class TrainingStatus:
   def tocEpoch(self, sess, e, validLoss=0):
     if (e + 1) % self.save_interval == 0 or e == self.num_epochs - 1:
       self.saver.save(sess, self.model_dir, global_step = e + 1)
-      print "model saved to {}".format(self.model_dir)
+      print("model saved to {}".format(self.model_dir))
 
     
     lines = open(self.save_dir + "/avgloss.txt", "r").readlines()
